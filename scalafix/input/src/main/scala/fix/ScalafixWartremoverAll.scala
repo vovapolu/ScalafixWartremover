@@ -124,8 +124,6 @@ object ScalafixWartremoverAll {
   
   class F
   new F().toString   // assert: Disable.toString
-  case object G
-  G.toString 
   1.toString         // ok
   A(1, "1").toString // ok 
 }
