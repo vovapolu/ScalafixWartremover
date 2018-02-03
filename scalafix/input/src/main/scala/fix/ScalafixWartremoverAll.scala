@@ -3,136 +3,129 @@ rules = [
   Disable
   NoInfer
   DisableSyntax
+  MissingFinal  // Wartremover.FinalCaseClass, Wartremover.LeakingSealed
 ]
 
 Disable.symbols = [
-  "java.lang.Object.equals" 
-  "java.lang.Object#`==`"
-  "java.lang.Object.eq"
-  "java.lang.Object.ne"
-  "scala.Any.asInstanceOf"
-  "scala.util.Either.LeftProjection.get"
-  "scala.util.Either.RightProjection.get"
-  "scala.Enumeration"
-  "scala.collection.JavaConversions"
-  "scala.collection.mutable"
-  "scala.collection.mutable.ListBuffer"
-  "scala.Option.get"
-  "scala.Some.get"
-  "scala.None.get"
-  "scala.util.Try.get"
-  "scala.util.Failure.get"
-  "scala.util.Success.get"
-  "scala.collection.IterableLike.head"
-  "scala.collection.TraversableLike.tail"
-  "scala.collection.TraversableLike.init"
-  "scala.collection.TraversableLike.last"
-  "scala.collection.TraversableOnce.reduce"
-  "scala.collection.TraversableOnce.reduceLeft"
-  "scala.collection.IterableLike.reduceRight"
+  "scala.Any.asInstanceOf" // Wartremover.AsInstanceOf
+
+  "scala.Any.isInstanceOf" // Wartremover.IsInstanceOf
+
+  "scala.util.Either.LeftProjection.get"  // Wartremover.EitherProjectionPartial
+  "scala.util.Either.RightProjection.get" // Wartremover.EitherProjectionPartial
+
+  "scala.Option.get" // Wartremover.OptionPartial
+  "scala.Some.get"   // Wartremover.OptionPartial
+  "scala.None.get"   // Wartremover.OptionPartial
+
+  "scala.util.Try.get"      // Wartremover.TryPartial
+  "scala.util.Failure.get"  // Wartremover.TryPartial
+  "scala.util.Success.get"  // Wartremover.TryPartial
+
+  "java.lang.Object.toString" // Wartremover.ToString
+
+  "java.lang.Object.equals",   // Wartremover.Equals
+  "java.lang.Object#`==`",     // Wartremover.Equals
+  "java.lang.Object.eq",       // Wartremover.Equals
+  "java.lang.Object.ne"        // Wartremover.Equals
+
+  "scala.Enumeration"          // Wartremover.Enumeration
 ]
 
 NoInfer.symbols = [
-  "scala.Any" 
-  "scala.AnyVal"
-  "java.io.Serializable"
-  "scala.Product."
-  "scala.collection.convert.WrapAsJava#`deprecated mapAsJavaMap`"
-  "scala.Nothing"
-  "scala.Option.option2Iterable"
-  "scala.Predef.any2stringadd"
+  "scala.AnyVal"               // Wartremover.AnyVal
+  "scala.Any"                  // Wartremover.Any
+  "java.io.Serializable"       // Wartremover.Serializable
+  "scala.Product."             // Wartremover.Product
+  "scala.Predef.any2stringadd" // Wartremover.StringPlusAny
+
+  "scala.Option.option2Iterable" // Wartremover.Option2Iterable
 ]
 
 DisableSyntax.keywords = [
-  var
-  null
-  return
-  throw
-  while
+  var    // Wartremover.Var
+  null   // Wartremover.Null
+  return // Wartremover.Return
+  throw  // Wartremover.Throw
+  while  // Wartremover.While
 ]
 
-DisableSyntax.noSemicolons = true
+DisableSyntax.noDefaultArgs = true  // Wartremover.DefaultArguments
+DisableSyntax.noFinalVal = true     // Wartremover.FinalVal
+DisableSyntax.noImplicitConversion = true // Wartremover.ImplicitConversion
 */
 package fix
 
-import scala.util.Try
+import scala.util.{ Failure, Success, Try }
 
-object BasicRulesSpec {
-  Array(1, 2, 3).equals(Array(4, 5, 6)) // assert: Disable.equals
-  Array(1, 2, 3) == Array(4, 5, 6) // assert: Disable.==
-  Array(1, 2, 3) eq Array(4, 5, 6) // assert: Disable.eq
-  Array(1, 2, 3) ne Array(4, 5, 6) // assert: Disable.ne
-
-  case class A(a: Int, s: String)
-  A(1, "1").equals(A(2, "2")) // OK: equals is overrided
-  // FIXME == should fail only for specific things like Array
-  A(1, "1") == A(2, "2") // assert: Disable.==
-
-  val any = List(1, true, "three") // assert: NoInfer.any
-  val xs = List(1, true) // assert: NoInfer.anyval
+object ScalafixWartremoverAll {
+  // Unsfase rules
 
   val x: Any = "123"
-  x.asInstanceOf[String] // assert: Disable.asInstanceOf
+  x.asInstanceOf[String]        // assert: Disable.asInstanceOf
+  if (x.isInstanceOf[String]) { // assert: Disable.isInstanceOf
+    println("don't do this")
+  }
 
-  val e = Left("a") // assert: NoInfer.nothing
-  e.left.get // assert: Disable.get
-  e.right.get // assert: Disable.get
+  Left("a").left.get  // assert: Disable.get
+  Left("a").right.get // assert: Disable.get
 
-// see https://github.com/scalacenter/scalafix/issues/493
-//  object WeekDay extends Enumeration { // assert: Disable.Enumeration
-//    type WeekDay = Value
-//    val Mon, Tue, Wed, Thu, Fri, Sat, Sun = Value
-//  }
+  Option(1).get // assert: Disable.get
+  Some(1).get   // assert: Disable.get
+  None.get      // assert: Disable.get
 
-  object O extends Serializable
-  val mistake = List("foo", "bar", O /* forgot O.toString */) // assert: NoInfer.serializable
-
-  import scala.collection.JavaConversions._ // assert: Disable.JavaConversions
-  val scalaMap: Map[String, String] = Map[String, String]()
-  // TODO add regex matching for symbols in Disable or NoInfer or just huge list of blocked implicits
-  val javaMap: java.util.Map[String, String] = scalaMap // assert: NoInfer.deprecated mapasjavamap
-
-  // TODO the same list or regex // assert: Disable.mutable
-  // val mutList = ListBuffer[Int]() // assert: Disable.ListBuffer
-
-  val nothing = ??? // FIXME NoInfer.nothing
-  val nothingList = List.empty // assert: NoInfer.nothing
+  Try { 1 }.get                    // assert: Disable.get
+  Success(1).get                   // assert: Disable.get
+  Failure(new Exception("ok")).get // assert: Disable.get
 
   var a = 1                 // assert: DisableSyntax.keywords.var
   val n = null              // assert: DisableSyntax.keywords.null
   def foo: Unit = return    // assert: DisableSyntax.keywords.return
   throw new Exception("ok") // assert: DisableSyntax.keywords.throw
-  val s = "semicolon";      // assert: DisableSyntax.noSemicolons
 
-  Some(1) zip Some(2) // assert: NoInfer.option2iterable
-  Option(1).get // assert: Disable.get
-  Some(1).get // assert: Disable.get
-  None.get // assert: Disable.get
-
+  val any = List(1, true, "three")   // assert: NoInfer.any
   val prod = List((1, 2, 3), (1, 2)) // assert: NoInfer.product
-  // TODO string + any shoudn't work
+
+  object O extends Serializable
+  val mistake = List("foo", "bar", O /* forgot O.toString */) // assert: NoInfer.serializable
+
   // "foo" + {} // assert: NoInfer.any2stringadd
+  {} + "bar"    // assert: NoInfer.any2stringadd
 
-  {} + "bar" // assert: NoInfer.any2stringadd
+  // Additional rules
 
-  while (true) { println("hi!") } // assert: DisableSyntax.keywords.while
+  val anyVal = List(1, false, 1.0) // assert: NoInfer.anyval
 
-  List(1, 2, 3).head // assert: Disable.head
-  Seq(1).head // assert: Disable.head
-  List(1, 2, 3).tail // assert: Disable.tail
-  Seq(1).tail // assert: Disable.tail
-  List(1, 2, 3).init // assert: Disable.init
-  Seq(1).init // assert: Disable.init
-  //List(1, 2, 3).last // assert: Disable.last
-  Seq(1).last // assert: Disable.last
-  List(1, 2, 3).reduce(_ + _) // assert: Disable.reduce
-  Seq(1).reduce(_ + _) // assert: Disable.reduce
-  //List(1, 2, 3).reduceLeft(_ + _) // assert: Disable.reduceLeft
-  Seq(1).reduceLeft(_ + _) // assert: Disable.reduceLeft
-  //List(1, 2, 3).reduceRight(_ + _) // assert: Disable.reduceRight
-  Seq(1).reduceRight(_ + _) // assert: Disable.reduceRight
-  // TODO there's some mess with inherited methods for collections
-  // possible solutions are to make a huge list again or regexes
+  def defaultArgs(i: Int = 1, s: String = "string") = ??? // assert: DisableSyntax.defaultArgs
 
-  Try { 1 }.get // assert: Disable.get
+  object WeekDay extends Enumeration { // assert: Disable.Enumeration
+    type WeekDay = Value
+    val Mon, Tue, Wed, Thu, Fri, Sat, Sun = Value
+  }
+  
+  Array(1, 2, 3).equals(Array(4, 5, 6)) // assert: Disable.equals
+  Array(1, 2, 3) == Array(4, 5, 6)      // assert: Disable.==
+  Array(1, 2, 3) eq Array(4, 5, 6)      // assert: Disable.eq
+  Array(1, 2, 3) ne Array(4, 5, 6)      // assert: Disable.ne
+
+  final case class A(a: Int, s: String)
+  A(1, "1").equals(A(2, "2")) // OK: equals is overridden
+  A(1, "1") == A(2, "2")      // assert: Disable.==
+
+  sealed trait T
+  class D extends T // assert: MissingFinal.class
+  trait E extends T // assert: MissingFinal.trait
+
+  implicit def str2int(s: String): Int = ??? // assert: DisableSyntax.implicitConversion
+  
+  Some(1) zip Some(2) // assert: NoInfer.option2iterable
+  
+  while (true) { println("at least try FP...") } // assert: DisableSyntax.keywords.while
+  
+  class F
+  new F().toString   // assert: Disable.toString
+  case object G
+  G.toString 
+  1.toString         // ok
+  A(1, "1").toString // ok 
 }
